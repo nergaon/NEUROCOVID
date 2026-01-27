@@ -346,23 +346,6 @@ def main():
     output_heatmap = in_dir + 'heatmap_top1000_all.jpg'
     output_table = in_dir + 'heatmap_top1000_all.txt'
     plot_heatmap_genes(expression_table_top, output_heatmap, output_table, cell_colors_map, treatment_colors_map, cell_types, treatments)
-    
-    #choose genes and do pca for each cell type seperatly. 
-    #cells_type = ["MON", "pDCs"]
-    #cell_dir = in_dir + "QC/cell/"
-    #for cell in cells_type:
-    #    df_cell = sort_table_df[sort_table_df.columns[sort_table_df.columns.str.contains(cell)]]
-    #    output_table = cell_dir + cell + '_log_express_gene.txt'
-    #    express_genes = select_rows(df_cell, min_expression, min_samples, output_table, genes_table)
-        # Calculate standard deviation for each gene and select top N most variable genes
-    #    gene_std = express_genes.std(axis=1)
-    #    top_genes = gene_std.sort_values(ascending=False).head(1000).index
-        # Subset the expression table to the top N genes
-    #    expression_table_top = express_genes.loc[top_genes]
-    #    plot_pca(expression_table_top, cell_dir, cell)
-    #    output_heatmap = cell_dir + '/heatmap_top10000_' + cell + '.jpg'
-    #    output_table = cell_dir + '/heatmap_top10000_' + cell + '.txt'
-    #    plot_heatmap_genes(expression_table_top, output_heatmap, output_table)
     return
 
 if __name__ == "__main__":
