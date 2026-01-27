@@ -119,14 +119,27 @@ def select_rows(df, min_expression, min_samples, output_table, genes_table):
     selected_rows_only_numbers = selected_rows.iloc[:,:-3]
     return(selected_rows_only_numbers)
 
-def plot_correlation(df, corr_figure):
-    # Compute correlation matrix
-    corr = df.corr()
+def colors(columns_names):
+    cell_colors_map = {
+        "Cortical_neurons": "#1f77b4",      # blue
+        "Cortical_neurons_microglia": "#ff7f0e",  # orange
+        "organoids": "#d62728",              # red
+        "Microglia": "#2ca02c"             # green
+    }    
+    treatment_colors_map = {
+        "mock": "#ffffff",                  # white (no fill)
+        "SARS-CoV": "#000000"               # black (fill)
+    }
+       # Step 6: Define color and marker mappings
+    treatment_markers = {
+        "mock": "o",        # circle
+        "SARS-CoV": "s"     # square
+    }
     # Extract metadata from column names
     # Parse cell type and treatment from sample names
     cell_types = []
     treatments = []
-    for col in df.columns:
+    for col in columns_names:
         if "Cortical_neurons_microglia" in col:
             cell_type = "Cortical_neurons_microglia"
         elif "Cortical_neurons" in col:
@@ -145,17 +158,11 @@ def plot_correlation(df, corr_figure):
             treatment = "unknown"       
         cell_types.append(cell_type)
         treatments.append(treatment)
-    # Define color mappings
-    cell_colors_map = {
-        "Cortical_neurons": "#1f77b4",      # blue
-        "Cortical_neurons_microglia": "#ff7f0e",  # orange
-        "organoids": "#d62728",              # red
-        "Microglia": "#2ca02c"             # green
-    }    
-    treatment_colors_map = {
-        "mock": "#ffffff",                  # white (no fill)
-        "SARS-CoV": "#000000"               # black (fill)
-    }
+    return cell_colors_map, treatment_colors_map, treatment_markers, cell_types, treatments
+
+def plot_correlation(df, corr_figure, cell_colors_map, treatment_colors_map, cell_types, treatments):
+    # Compute correlation matrix
+    corr = df.corr()
     # Create color bars
     col_colors = pd.DataFrame({
         "Cell Type": [cell_colors_map.get(ct, "gray") for ct in cell_types],
@@ -196,7 +203,7 @@ def plot_correlation(df, corr_figure):
     plt.close() 
     return
 
-def plot_pca(df, in_dir, condition):
+def plot_pca(df, in_dir, condition, cell_colors_map, treatment_markers, cell_types, treatments):
     """
     Perform PCA on the expression table and plot the first two principal components
     colored by cell type and treatment.
@@ -204,68 +211,22 @@ def plot_pca(df, in_dir, condition):
     # Step 1: Transpose and standardize the DataFrame
     df_transposed = df.T
     scaler = StandardScaler()
-    df_scaled = scaler.fit_transform(df_transposed)
-    
+    df_scaled = scaler.fit_transform(df_transposed)   
     # Step 2: Perform PCA
     pca = PCA(n_components=4)
     pca_result = pca.fit_transform(df_scaled)
-    
     # Step 3: Get explained variance ratio
     explained_variance = pca.explained_variance_ratio_ * 100
-    
     # Step 4: Create PCA results DataFrame
     pca_df = pd.DataFrame(pca_result, columns=['PCA1', 'PCA2', 'PCA3', 'PCA4'], index=df.columns)
-    
-    # Step 5: Extract cell type and treatment from sample names
-    cell_types = []
-    treatments = []
-    
-    for col in df.columns:
-        # Extract cell type (check longest strings first)
-        if "Cortical_neurons_microglia" in col:
-            cell_type = "Cortical_neurons_microglia"
-        elif "Cortical_neurons" in col:
-            cell_type = "Cortical_neurons"
-        elif "Microglia" in col:
-            cell_type = "Microglia"
-        elif "organoids" in col:
-            cell_type = "organoids"
-        else:
-            cell_type = "unknown"
-        
-        # Extract treatment
-        if "mock" in col:
-            treatment = "mock"
-        elif "SARS-CoV" in col or "SARS_CoV" in col:
-            treatment = "SARS-CoV"
-        else:
-            treatment = "unknown"
-        
-        cell_types.append(cell_type)
-        treatments.append(treatment)
-    
     pca_df['cell'] = cell_types
     pca_df['treatment'] = treatments
-    
-    # Step 6: Define color and marker mappings
-    cell_colors_map = {
-        "Cortical_neurons": "#1f77b4",      # blue
-        "Cortical_neurons_microglia": "#ff7f0e",  # orange
-        "Microglia": "#2ca02c",             # green
-        "organoids": "#d62728"              # red
-    }    
-    treatment_markers = {
-        "mock": "o",        # circle
-        "SARS-CoV": "s"     # square
-    }
-    
     # Step 7: Plot PCA results
     pairs = [(1,2), (1, 3), (1, 4), (2, 3), (2, 4), (3, 4)]
     for (pc_x, pc_y) in pairs:
         plt.figure(figsize=(10, 8))
         pca_component_1 = "PCA" + str(pc_x)
-        pca_component_2 = "PCA" + str(pc_y)
-        
+        pca_component_2 = "PCA" + str(pc_y)       
         # Plot each combination of cell type and treatment
         for cell_type in sorted(pca_df['cell'].unique()):
             for treatment in sorted(pca_df['treatment'].unique()):
@@ -295,63 +256,24 @@ def plot_pca(df, in_dir, condition):
     
     return
 
-def plot_heatmap_genes(df, output_heatmap, output_table):
-    df_filtered = df.apply(zscore, axis=1)  # Standardize across genes (rows)
-    
-    # Extract cell type and treatment from column names
-    cell_types = []
-    treatments = []
-    
-    for col in df.columns:
-        # Extract cell type (check longest strings first)
-        if "Cortical_neurons_microglia" in col:
-            cell_type = "Cortical_neurons_microglia"
-        elif "Cortical_neurons" in col:
-            cell_type = "Cortical_neurons"
-        elif "Microglia" in col:
-            cell_type = "Microglia"
-        elif "organoids" in col:
-            cell_type = "organoids"
-        else:
-            cell_type = "unknown"
-        
-        # Extract treatment
-        if "mock" in col:
-            treatment = "mock"
-        elif "SARS-CoV" in col or "SARS_CoV" in col:
-            treatment = "SARS-CoV"
-        else:
-            treatment = "unknown"
-        
-        cell_types.append(cell_type)
-        treatments.append(treatment)
-    
-    # Define color mappings (same as plot_correlation)
-    cell_colors_map = {
-        "Cortical_neurons": "#1f77b4",      # blue
-        "Cortical_neurons_microglia": "#ff7f0e",  # orange
-        "Microglia": "#2ca02c",             # green
-        "organoids": "#d62728"              # red
-    }
-    
-    treatment_colors_map = {
-        "mock": "#ffffff",                  # white (no fill)
-        "SARS-CoV": "#000000"               # black (fill)
-    }
-    
-    # Create color bars (aligned with column order)
+def plot_heatmap_genes(df, output_heatmap, output_table, cell_colors_map, treatment_colors_map, cell_types, treatments):
+    df_filtered = pd.DataFrame(zscore(df.to_numpy(), axis=1, nan_policy="omit"),
+    index=df.index,
+    columns=df.columns)
+    # Extract metadata from column names
     col_colors = pd.DataFrame({
         "Cell Type": [cell_colors_map.get(ct, "gray") for ct in cell_types],
         "Treatment": [treatment_colors_map.get(tr, "gray") for tr in treatments]
     }, index=df.columns)
-    
     # Plot matrix with color bars on top and side
     g = sns.clustermap(
         df_filtered, cmap="coolwarm", center=0, 
         col_cluster=False, row_cluster=True,  # Keep original column order
         col_colors=col_colors,
-        figsize=(12, 10),
-        cbar_pos=(0.02, 0.8, 0.03, 0.18))
+        figsize=(12, 10),  # Adjust size if needed
+        cbar_pos=(0.02, 0.8, 0.03, 0.18), # Adjust color bar
+        #dendrogram_ratio=(0.01, 0.01))   # Hide dendrograms
+        )
     
     g.ax_heatmap.set_xticklabels([])  # Remove x-axis labels
     
@@ -404,7 +326,6 @@ def main():
     plot_hist(counts_table_log,result_dict, output_figure)
     
     #plot_scatter(counts_table_log, samples, in_dir)
-    
     #create a table with only express genes
     sort_table_df = sort_table(counts_table_log)
     output_table = in_dir + 'log_express_gene.txt'
@@ -419,11 +340,12 @@ def main():
     #z normelaize the table
     #create correlation matrix of the 1000 genes that have the highest std
     corr_figure = in_dir + 'correlation.jpg'
-    plot_correlation(expression_table_top, corr_figure)
-    plot_pca(expression_table_top, in_dir, 'all')
+    cell_colors_map, treatment_colors_map, treatment_markers, cell_types, treatments = colors(expression_table_top.columns)
+    plot_correlation(expression_table_top, corr_figure, cell_colors_map, treatment_colors_map, cell_types, treatments)
+    plot_pca(expression_table_top, in_dir, 'all', cell_colors_map, treatment_markers, cell_types, treatments)
     output_heatmap = in_dir + 'heatmap_top1000_all.jpg'
     output_table = in_dir + 'heatmap_top1000_all.txt'
-    plot_heatmap_genes(expression_table_top, output_heatmap, output_table)
+    plot_heatmap_genes(expression_table_top, output_heatmap, output_table, cell_colors_map, treatment_colors_map, cell_types, treatments)
     
     #choose genes and do pca for each cell type seperatly. 
     #cells_type = ["MON", "pDCs"]
