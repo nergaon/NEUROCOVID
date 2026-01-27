@@ -1,0 +1,256 @@
+
+        ==========     _____ _    _ ____  _____  ______          _____  
+        =====         / ____| |  | |  _ \|  __ \|  ____|   /\   |  __ \ 
+          =====      | (___ | |  | | |_) | |__) | |__     /  \  | |  | |
+            ====      \___ \| |  | |  _ <|  _  /|  __|   / /\ \ | |  | |
+              ====    ____) | |__| | |_) | | \ \| |____ / ____ \| |__| |
+        ==========   |_____/ \____/|____/|_|  \_\______/_/    \_\_____/
+	  v2.0.1
+
+//========================== featureCounts setting ===========================\\
+||                                                                            ||
+||             Input files : 30 BAM files                                     ||
+||                           o Cortical_neuorns_SARS-CoV_14.sort.bam          ||
+||                           o Cortical_neuorns_SARS-CoV_15.sort.bam          ||
+||                           o Cortical_neuorns_SARS-CoV_16.sort.bam          ||
+||                           o Cortical_neuorns_SARS-CoV_17.sort.bam          ||
+||                           o Cortical_neurons_microglia_mock_26.sort.bam    ||
+||                           o Cortical_neurons_microglia_mock_27.sort.bam    ||
+||                           o Cortical_neurons_microglia_mock_28.sort.bam    ||
+||                           o Cortical_neurons_microglia_mock_29.sort.bam    ||
+||                           o Cortical_neurons_microglia_SARS-CoV_30.sor ... ||
+||                           o Cortical_neurons_microglia_SARS-CoV_31.sor ... ||
+||                           o Cortical_neurons_microglia_SARS-CoV_32.sor ... ||
+||                           o Cortical_neurons_microglia_SARS-CoV_33.sor ... ||
+||                           o Cortical_neurons_mock_10.sort.bam              ||
+||                           o Cortical_neurons_mock_11.sort.bam              ||
+||                           o Cortical_neurons_mock_12.sort.bam              ||
+||                           o Cortical_neurons_mock_13.sort.bam              ||
+||                           o Microglia_mock_18.sort.bam                     ||
+||                           o Microglia_mock_19.sort.bam                     ||
+||                           o Microglia_mock_20.sort.bam                     ||
+||                           o Microglia_mock_21.sort.bam                     ||
+||                           o Microglia_SARS-CoV_22.sort.bam                 ||
+||                           o Microglia_SARS-CoV_23.sort.bam                 ||
+||                           o Microglia_SARS-CoV_24.sort.bam                 ||
+||                           o Microglia_SARS-CoV_25.sort.bam                 ||
+||                           o organoids_mock_34.sort.bam                     ||
+||                           o organoids_mock_96.sort.bam                     ||
+||                           o organoids_mock_97.sort.bam                     ||
+||                           o organoids_SARS-CoV_35.sort.bam                 ||
+||                           o organoids_SARS-CoV_98.sort.bam                 ||
+||                           o organoids_SARS-CoV_99.sort.bam                 ||
+||                                                                            ||
+||             Output file : expression_table_HN1.txt                         ||
+||                 Summary : expression_table_HN1.txt.summary                 ||
+||              Annotation : Homo_sapiens.GRCh38.113_chr_HN1.gtf (GTF)        ||
+||      Dir for temp files : /gpfs0/tals/projects/Analysis/NEUROCOVID/had ... ||
+||                                                                            ||
+||                 Threads : 1                                                ||
+||                   Level : meta-feature level                               ||
+||              Paired-end : yes                                              ||
+||      Multimapping reads : not counted                                      ||
+|| Multi-overlapping reads : not counted                                      ||
+||   Min overlapping bases : 1                                                ||
+||                                                                            ||
+||          Chimeric reads : not counted                                      ||
+||        Both ends mapped : required                                         ||
+||                                                                            ||
+\\============================================================================//
+
+//================================= Running ==================================\\
+||                                                                            ||
+|| Load annotation file Homo_sapiens.GRCh38.113_chr_HN1.gtf ...               ||
+||    Features : 2164410                                                      ||
+||    Meta-features : 78932                                                   ||
+||    Chromosomes/contigs : 70                                                ||
+||                                                                            ||
+|| Process BAM file Cortical_neuorns_SARS-CoV_14.sort.bam...                  ||
+||    Paired-end reads are included.                                          ||
+||    Total alignments : 26280834                                             ||
+||    Successfully assigned alignments : 19515895 (74.3%)                     ||
+||    Running time : 1.23 minutes                                             ||
+||                                                                            ||
+|| Process BAM file Cortical_neuorns_SARS-CoV_15.sort.bam...                  ||
+||    Paired-end reads are included.                                          ||
+||    Total alignments : 28692654                                             ||
+||    Successfully assigned alignments : 21552005 (75.1%)                     ||
+||    Running time : 1.37 minutes                                             ||
+||                                                                            ||
+|| Process BAM file Cortical_neuorns_SARS-CoV_16.sort.bam...                  ||
+||    Paired-end reads are included.                                          ||
+||    Total alignments : 35041123                                             ||
+||    Successfully assigned alignments : 25740058 (73.5%)                     ||
+||    Running time : 1.76 minutes                                             ||
+||                                                                            ||
+|| Process BAM file Cortical_neuorns_SARS-CoV_17.sort.bam...                  ||
+||    Paired-end reads are included.                                          ||
+||    Total alignments : 33354332                                             ||
+||    Successfully assigned alignments : 25405703 (76.2%)                     ||
+||    Running time : 1.58 minutes                                             ||
+||                                                                            ||
+|| Process BAM file Cortical_neurons_microglia_mock_26.sort.bam...            ||
+||    Paired-end reads are included.                                          ||
+||    Total alignments : 33747095                                             ||
+||    Successfully assigned alignments : 24691977 (73.2%)                     ||
+||    Running time : 1.74 minutes                                             ||
+||                                                                            ||
+|| Process BAM file Cortical_neurons_microglia_mock_27.sort.bam...            ||
+||    Paired-end reads are included.                                          ||
+||    Total alignments : 33984614                                             ||
+||    Successfully assigned alignments : 24620921 (72.4%)                     ||
+||    Running time : 1.82 minutes                                             ||
+||                                                                            ||
+|| Process BAM file Cortical_neurons_microglia_mock_28.sort.bam...            ||
+||    Paired-end reads are included.                                          ||
+||    Total alignments : 31712961                                             ||
+||    Successfully assigned alignments : 23196282 (73.1%)                     ||
+||    Running time : 1.62 minutes                                             ||
+||                                                                            ||
+|| Process BAM file Cortical_neurons_microglia_mock_29.sort.bam...            ||
+||    Paired-end reads are included.                                          ||
+||    Total alignments : 34329747                                             ||
+||    Successfully assigned alignments : 25470077 (74.2%)                     ||
+||    Running time : 1.70 minutes                                             ||
+||                                                                            ||
+|| Process BAM file Cortical_neurons_microglia_SARS-CoV_30.sort.bam...        ||
+||    Paired-end reads are included.                                          ||
+||    Total alignments : 30796819                                             ||
+||    Successfully assigned alignments : 23672717 (76.9%)                     ||
+||    Running time : 1.47 minutes                                             ||
+||                                                                            ||
+|| Process BAM file Cortical_neurons_microglia_SARS-CoV_31.sort.bam...        ||
+||    Paired-end reads are included.                                          ||
+||    Total alignments : 35805947                                             ||
+||    Successfully assigned alignments : 26200055 (73.2%)                     ||
+||    Running time : 1.91 minutes                                             ||
+||                                                                            ||
+|| Process BAM file Cortical_neurons_microglia_SARS-CoV_32.sort.bam...        ||
+||    Paired-end reads are included.                                          ||
+||    Total alignments : 39837207                                             ||
+||    Successfully assigned alignments : 28877016 (72.5%)                     ||
+||    Running time : 2.04 minutes                                             ||
+||                                                                            ||
+|| Process BAM file Cortical_neurons_microglia_SARS-CoV_33.sort.bam...        ||
+||    Paired-end reads are included.                                          ||
+||    Total alignments : 33312256                                             ||
+||    Successfully assigned alignments : 24248636 (72.8%)                     ||
+||    Running time : 1.74 minutes                                             ||
+||                                                                            ||
+|| Process BAM file Cortical_neurons_mock_10.sort.bam...                      ||
+||    Paired-end reads are included.                                          ||
+||    Total alignments : 30450499                                             ||
+||    Successfully assigned alignments : 22450346 (73.7%)                     ||
+||    Running time : 1.48 minutes                                             ||
+||                                                                            ||
+|| Process BAM file Cortical_neurons_mock_11.sort.bam...                      ||
+||    Paired-end reads are included.                                          ||
+||    Total alignments : 33447978                                             ||
+||    Successfully assigned alignments : 24892867 (74.4%)                     ||
+||    Running time : 1.66 minutes                                             ||
+||                                                                            ||
+|| Process BAM file Cortical_neurons_mock_12.sort.bam...                      ||
+||    Paired-end reads are included.                                          ||
+||    Total alignments : 39859585                                             ||
+||    Successfully assigned alignments : 29585985 (74.2%)                     ||
+||    Running time : 1.94 minutes                                             ||
+||                                                                            ||
+|| Process BAM file Cortical_neurons_mock_13.sort.bam...                      ||
+||    Paired-end reads are included.                                          ||
+||    Total alignments : 29731652                                             ||
+||    Successfully assigned alignments : 21549316 (72.5%)                     ||
+||    Running time : 1.49 minutes                                             ||
+||                                                                            ||
+|| Process BAM file Microglia_mock_18.sort.bam...                             ||
+||    Paired-end reads are included.                                          ||
+||    Total alignments : 33868132                                             ||
+||    Successfully assigned alignments : 24584168 (72.6%)                     ||
+||    Running time : 1.68 minutes                                             ||
+||                                                                            ||
+|| Process BAM file Microglia_mock_19.sort.bam...                             ||
+||    Paired-end reads are included.                                          ||
+||    Total alignments : 29010363                                             ||
+||    Successfully assigned alignments : 21469765 (74.0%)                     ||
+||    Running time : 1.39 minutes                                             ||
+||                                                                            ||
+|| Process BAM file Microglia_mock_20.sort.bam...                             ||
+||    Paired-end reads are included.                                          ||
+||    Total alignments : 42014168                                             ||
+||    Successfully assigned alignments : 30598391 (72.8%)                     ||
+||    Running time : 2.02 minutes                                             ||
+||                                                                            ||
+|| Process BAM file Microglia_mock_21.sort.bam...                             ||
+||    Paired-end reads are included.                                          ||
+||    Total alignments : 37984951                                             ||
+||    Successfully assigned alignments : 28140293 (74.1%)                     ||
+||    Running time : 1.81 minutes                                             ||
+||                                                                            ||
+|| Process BAM file Microglia_SARS-CoV_22.sort.bam...                         ||
+||    Paired-end reads are included.                                          ||
+||    Total alignments : 30411856                                             ||
+||    Successfully assigned alignments : 22720887 (74.7%)                     ||
+||    Running time : 1.53 minutes                                             ||
+||                                                                            ||
+|| Process BAM file Microglia_SARS-CoV_23.sort.bam...                         ||
+||    Paired-end reads are included.                                          ||
+||    Total alignments : 31784650                                             ||
+||    Successfully assigned alignments : 23762548 (74.8%)                     ||
+||    Running time : 1.64 minutes                                             ||
+||                                                                            ||
+|| Process BAM file Microglia_SARS-CoV_24.sort.bam...                         ||
+||    Paired-end reads are included.                                          ||
+||    Total alignments : 33568437                                             ||
+||    Successfully assigned alignments : 25098399 (74.8%)                     ||
+||    Running time : 1.69 minutes                                             ||
+||                                                                            ||
+|| Process BAM file Microglia_SARS-CoV_25.sort.bam...                         ||
+||    Paired-end reads are included.                                          ||
+||    Total alignments : 33608212                                             ||
+||    Successfully assigned alignments : 25298984 (75.3%)                     ||
+||    Running time : 1.68 minutes                                             ||
+||                                                                            ||
+|| Process BAM file organoids_mock_34.sort.bam...                             ||
+||    Paired-end reads are included.                                          ||
+||    Total alignments : 34971601                                             ||
+||    Successfully assigned alignments : 25592809 (73.2%)                     ||
+||    Running time : 1.75 minutes                                             ||
+||                                                                            ||
+|| Process BAM file organoids_mock_96.sort.bam...                             ||
+||    Paired-end reads are included.                                          ||
+||    Total alignments : 40569854                                             ||
+||    Successfully assigned alignments : 29132975 (71.8%)                     ||
+||    Running time : 2.07 minutes                                             ||
+||                                                                            ||
+|| Process BAM file organoids_mock_97.sort.bam...                             ||
+||    Paired-end reads are included.                                          ||
+||    Total alignments : 29858204                                             ||
+||    Successfully assigned alignments : 21583783 (72.3%)                     ||
+||    Running time : 1.51 minutes                                             ||
+||                                                                            ||
+|| Process BAM file organoids_SARS-CoV_35.sort.bam...                         ||
+||    Paired-end reads are included.                                          ||
+||    Total alignments : 41759269                                             ||
+||    Successfully assigned alignments : 30625047 (73.3%)                     ||
+||    Running time : 2.21 minutes                                             ||
+||                                                                            ||
+|| Process BAM file organoids_SARS-CoV_98.sort.bam...                         ||
+||    Paired-end reads are included.                                          ||
+||    Total alignments : 29110730                                             ||
+||    Successfully assigned alignments : 21545146 (74.0%)                     ||
+||    Running time : 1.42 minutes                                             ||
+||                                                                            ||
+|| Process BAM file organoids_SARS-CoV_99.sort.bam...                         ||
+||    Paired-end reads are included.                                          ||
+||    Total alignments : 33459111                                             ||
+||    Successfully assigned alignments : 24165399 (72.2%)                     ||
+||    Running time : 1.70 minutes                                             ||
+||                                                                            ||
+|| Write the final count table.                                               ||
+|| Write the read assignment summary.                                         ||
+||                                                                            ||
+|| Summary of counting results can be found in file "/gpfs0/tals/projects/An  ||
+|| alysis/NEUROCOVID/hadas_harschnitz/bulkRNA//expression_table/expression_t  ||
+|| able_HN1.txt.summary"                                                      ||
+||                                                                            ||
+\\============================================================================//
+
