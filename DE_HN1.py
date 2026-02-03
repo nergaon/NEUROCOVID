@@ -16,12 +16,11 @@ def differential_expression(df, conditions, mock_label, virus_label, fc_threshol
         down_genes: dict of genes up in mock
         results_df: dataframe of all DE results
     """
-    min_sd = 1e-4   # for log-scaled data. fileter genes with very low variance
-    # use 1e-3 if data are raw counts or CPM/TPM
     all_results = []
     up_genes = {}      # genes up in virus per condition
     down_genes = {}    # genes up in mock per condition
     problem_genes = set() # genes causing precision loss warnings
+    print("size of df:", np.shape(df))
     for cond in conditions:
         cond_cols = [c for c in df.columns if get_condition_from_col(c, mock_label, virus_label) == cond]
         if len(cond_cols) == 0:
@@ -35,15 +34,12 @@ def differential_expression(df, conditions, mock_label, virus_label, fc_threshol
         mock_data = df[mock_cols]
         virus_data = df[virus_cols]
         # expression filter. at least 2 samples with min expression, from either condition
-        expr_mask = ((mock_data >= min_expression).sum(axis=1) >= min_samples) | \
-               ((virus_data >= min_expression).sum(axis=1) >= min_samples)
-        mock_mean  = mock_data.mean(axis=1)
-        virus_mean = virus_data.mean(axis=1)
-        between_sd = pd.concat([mock_mean, virus_mean], axis=1).std(axis=1)
-        sd_mask = between_sd >= min_sd
-        mask = expr_mask & sd_mask
+        mask = ((mock_data > min_expression).sum(axis=1) >= min_samples) | \
+               ((virus_data > min_expression).sum(axis=1) >= min_samples)
+        false_genes = mask[mask == False].index.tolist()
         mock_data = mock_data[mask]
         virus_data = virus_data[mask]
+        print(f"{cond}: {np.shape(mock_data)[0]} genes pass expression filter")
         cond_results = []
         for gene in mock_data.index:   
             mock_vals = mock_data.loc[gene].values
@@ -58,19 +54,19 @@ def differential_expression(df, conditions, mock_label, virus_label, fc_threshol
             #t_stat, p_val = ttest_ind(virus_vals, mock_vals, equal_var=False)
             mean_mock = np.mean(mock_vals) + 1e-9 # to avoid division by zero
             mean_virus = np.mean(virus_vals) + 1e-9
-            log2fc = np.log2(mean_virus / mean_mock)
-            cond_results.append([gene, cond, mean_mock, mean_virus, log2fc, p_val])
-        cond_df = pd.DataFrame(cond_results, columns=["Gene","Condition","Mean_Mock", "Mean_Virus","Log2FC","PValue"])
+            #log2fc = np.log2(mean_virus / mean_mock)
+            fc = (mean_virus / mean_mock)
+            cond_results.append([gene, cond, mean_mock, mean_virus, fc, p_val])
+        cond_df = pd.DataFrame(cond_results, columns=["Gene","Condition","Mean_Mock", "Mean_Virus","FC","PValue"])
         cond_df["FDR"] = multipletests(cond_df["PValue"], method="fdr_bh")[1]
         # Significant genes
-        #sig = cond_df[(cond_df["FDR"] < pval_threshold) & (abs(cond_df["Log2FC"]) > np.log2(fc_threshold))]
-        sig = cond_df[(cond_df["PValue"] < pval_threshold) & (abs(cond_df["Log2FC"]) > np.log2(fc_threshold))]
-        up_genes[cond] = set(sig[sig["Log2FC"] > np.log2(fc_threshold)]["Gene"])
-        down_genes[cond] = set(sig[sig["Log2FC"] < -np.log2(fc_threshold)]["Gene"])
+        sig = cond_df[(cond_df["FDR"] < pval_threshold) & (abs(cond_df["FC"]) > fc_threshold)]
+        #sig = cond_df[(cond_df["PValue"] < pval_threshold) & (abs(cond_df["Log2FC"]) > np.log2(fc_threshold))]
+        up_genes[cond] = set(sig[sig["FC"] > fc_threshold]["Gene"])
+        down_genes[cond] = set(sig[sig["FC"] < -fc_threshold]["Gene"])
         all_results.append(cond_df)
     results_df = pd.concat(all_results, ignore_index=True)
     print(f"{len(problem_genes)} genes cause precision loss")
-    print(problem_genes) 
     problem = pd.DataFrame({"gene": list(problem_genes)})
     problem.to_csv("/gpfs0/tals/projects/Analysis/NEUROCOVID/hadas_harschnitz/bulkRNA/DE/problem_genes.csv", index=False)
     return up_genes, down_genes, results_df
@@ -115,8 +111,9 @@ def plot_venn(gene_dict, title, output_file):
 def main():
     min_samples = 2 #min 2 samples with less than min expression counts
     min_expression = 6 #min log2 expression value
-    fc_threshold = 1.1 #log2​(1.1)≈0.138
-    pval_threshold = 0.05
+    fc_threshold = 1 #log2​(1)=0
+    #pval_threshold = 0.05
+    pval_threshold = 0.1
     # df: rows=genes, columns=samples
     # columns names contain both condition and treatment info, e.g.
     # 'Cortical_neurons_microglia_mock_01', 'Cortical_neurons_microglia_SARS-CoV_02', etc.
