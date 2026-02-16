@@ -9,6 +9,9 @@ import seaborn as sns
 import matplotlib.patches as mpatches
 import gseapy as gp
 from gprofiler import GProfiler
+from matplotlib.lines import Line2D
+from plot_config import colors
+from plot_config import sort_table
 
 def differential_expression_deseq2(df, conditions, mock_label, virus_label, fc_threshold, pval_threshold, min_expression, out_dir=None):
     """
@@ -79,22 +82,44 @@ def differential_expression_deseq2(df, conditions, mock_label, virus_label, fc_t
         enrichmen(background_genes, up_genes[cond], out_dir, cond, "up_SARS-CoV")
         enrichmen(background_genes, down_genes[cond], out_dir, cond, "up_mock")
         #plot heatmap
-        plot_heatmap(virus_label, up_genes, down_genes, count_data, cond, out_dir)
-        
+        cell_colors_map, treatment_colors_map, treatment_markers, cell_types, treatments = colors(df.columns)
+        plot_heatmap(virus_label, up_genes[cond], down_genes[cond], count_data, cond, out_dir, cell_colors_map, treatment_colors_map, cell_types, treatments, df)
+
     results_df = pd.concat(all_results, ignore_index=True)
     sum_table = pd.DataFrame(rows)
     print(sum_table)
     return up_genes, down_genes, results_df
 
-def plot_heatmap(virus_label,up_genes, down_genes, count_data, cond, out_dir):
+def arrangeDS(count_data_df, samples):
+    conditions = ["Cortical_neurons_microglia", "Cortical_neurons", "Microglia", "organoids"]
+    mock_label = "mock"
+    virus_label = "SARS-CoV"
+    #make the df to lood nice in heatmap
+    heatmap_df = count_data_df.clip(lower=64) #Replaces every value < 64 with 64
+    heatmap_df = np.log2(heatmap_df)
+    if samples == "one": #z-score on all samples - we can see only differeances between samples and not between virues and mock
+        #row-wise z-score (better pattern visibility)
+        heatmap_df = heatmap_df.sub(heatmap_df.mean(axis=1), axis=0)
+        heatmap_df = heatmap_df.div(heatmap_df.std(axis=1) + 1e-6, axis=0)
+    else: #z-score for each condition
+        for cond in conditions:
+            cond_cols = [c for c in heatmap_df.columns if get_condition_from_col(c, mock_label, virus_label) == cond]
+            count_data = heatmap_df[cond_cols]
+            count_data = count_data.sub(count_data.mean(axis=1), axis=0)
+            count_data = count_data.div(count_data.std(axis=1) + 1e-6, axis=0)
+            heatmap_df.update(count_data)
+    return(heatmap_df)
+
+def plot_heatmap(virus_label,up_genes, down_genes, count_data, cond, out_dir, cell_colors_map, treatment_colors_map, cell_types, treatments, df):
     output_heatmap = out_dir + f"heatmap_{cond}_deseq2_FC_1.5.png"
-    sig_genes = set().union(*up_genes.values(), *down_genes.values())
+    sig_genes = list(set(up_genes) | set(down_genes))
+    #sig_genes = set().union(*up_genes.values(), *down_genes.values())
     print(f"Total significant genes: {len(sig_genes)}")
     heatmap_df = count_data.loc[count_data.index.intersection(sig_genes)]
-    heatmap_df = np.log2(heatmap_df + 1)
-    #row-wise z-score (better pattern visibility)
-    heatmap_df = heatmap_df.sub(heatmap_df.mean(axis=1), axis=0)
-    heatmap_df = heatmap_df.div(heatmap_df.std(axis=1) + 1e-6, axis=0)
+    heatmap_df = arrangeDS(heatmap_df, "one")
+    output_heatmap_df = out_dir + f"df_{cond}_oneCond.csv"
+    heatmap_df.to_csv(output_heatmap_df, index = True)
+    #only the col from one sample
     col_colors = ["black" if virus_label in c else "pink" for c in heatmap_df.columns]
     color_lut = {"SARS-CoV": "black","mock": "pink"}
     g = sns.clustermap(heatmap_df, cmap="coolwarm", center=0, col_colors=col_colors, cbar_pos=(0.02, 0.8, 0.03, 0.18),
@@ -104,6 +129,40 @@ def plot_heatmap(virus_label,up_genes, down_genes, count_data, cond, out_dir):
     leg = g.ax_col_dendrogram.legend(handles=handles, title=cond, loc="center", bbox_to_anchor=(0.5, 0.7), ncol=2,
         frameon=False, fontsize=20)       # legend labels
     leg.get_title().set_fontsize(20)   # legend title
+    g.savefig(output_heatmap, dpi=300, bbox_inches="tight")    
+    
+    # Get the ordered gene list
+    ordered_genes = heatmap_df.index[g.dendrogram_row.reordered_ind]
+    heatmap_df_ordered = df.loc[ordered_genes]
+    heatmap_df_ordered = arrangeDS(heatmap_df_ordered, "all")
+    output_heatmap_df = out_dir + f"df_{cond}_allCond.csv"
+    heatmap_df_ordered.to_csv(output_heatmap_df, index = True)
+    #all the samples
+    col_colors = pd.DataFrame({
+        "Cell Type": [cell_colors_map.get(ct, "gray") for ct in cell_types],
+        "Treatment": [treatment_colors_map.get(tr, "gray") for tr in treatments]
+    }, index=df.columns)
+    # Create custom legend
+    cell_legend_1 = Line2D([0], [0], color="#1f77b4", lw=6, label="Cortical_neurons")
+    cell_legend_2 = Line2D([0], [0], color="#ff7f0e", lw=6, label="Cortical_neurons_microglia")
+    cell_legend_3 = Line2D([0], [0], color="#2ca02c", lw=6, label="Microglia")
+    cell_legend_4 = Line2D([0], [0], color="#d62728", lw=6, label="organoids")
+    
+    treatment_legend_1 = Line2D([0], [0], color="pink", lw=6, label="mock", markeredgecolor="pink", marker='s', markersize=10)
+    treatment_legend_2 = Line2D([0], [0], color="black", lw=6, label="SARS-CoV", marker='s', markersize=10)
+    output_heatmap = out_dir + f"heatmap_{cond}_deseq2_FC_1.5_allSamples.png"
+    g = sns.clustermap(heatmap_df_ordered, cmap="coolwarm", center=0, col_colors=col_colors, cbar_pos=(0.02, 0.8, 0.03, 0.18),
+        col_cluster=False, row_cluster=False, xticklabels=False, yticklabels=False, figsize=(12, 14))
+    
+    # Add legend to the plot
+    plt.legend(handles=[cell_legend_1, cell_legend_2, cell_legend_3, cell_legend_4,
+                       treatment_legend_1, treatment_legend_2],
+               loc='center', bbox_to_anchor=(1.05, -0.8), fontsize=12,
+               title="Cell Type / Treatment")
+    
+    #plt.title(f"heatmap_{cond}", loc="center")
+    titleName = f"heatmap_{cond}_" + str(len(heatmap_df_ordered)) + "_genes_all_samples"
+    g.ax_heatmap.set_title(titleName, y=1.25, fontsize=20)
     g.savefig(output_heatmap, dpi=300, bbox_inches="tight")    
     return
 
@@ -131,16 +190,6 @@ def get_condition_from_col(col_name, mock_label, virus_label):
         idx = len(col_name)
     return col_name[:idx].rstrip("_")
 
-def build_overlap_df(gene_dict, output_file):
-    # Build a dataframe showing overlaps between conditions
-    conds = list(gene_dict.keys())
-    df_overlap = pd.DataFrame(index=conds, columns=conds, dtype=int)
-    for c1 in conds:
-        for c2 in conds:
-            df_overlap.loc[c1, c2] = len(gene_dict[c1].intersection(gene_dict[c2]))
-    df_overlap.to_csv(output_file)
-    return df_overlap
-
 def dict_to_table(genes_by_condition):
     #Convert a dictionary of gene sets to a boolean dataframe
     all_genes = sorted(set().union(*genes_by_condition.values()))
@@ -153,15 +202,17 @@ def dict_to_table(genes_by_condition):
     return df_bool
 
 def plot_venn(gene_dict, title, output_file):
-    #cell_colors_map = {
-    #    "Cortical_neurons": "#1f77b4",
-    #    "Cortical_neurons_microglia": "#ff7f0e",
-    #    "organoids": "#d62728",
-    #    "Microglia": "#2ca02c"
-    #}
+    cell_colors_map = {
+        "Cortical_neurons": "#1f77b4",
+        "Cortical_neurons_microglia": "#ff7f0e",
+        "organoids": "#d62728",
+        "Microglia": "#2ca02c"
+    }
+    colors = [cell_colors_map[name] for name in gene_dict.keys()]
     plt.figure(figsize=(8, 8))
     venn(gene_dict,
         #cmap=cell_colors_map,  # this is not working
+        cmap=colors,  
         alpha=0.6)
 
     plt.title(title)
@@ -184,6 +235,7 @@ def main():
     counts_table = pd.read_csv(input_table, delimiter =  "\s|\t", engine='python', skiprows=1)        
     counts_table = counts_table.reset_index().set_index('Geneid', drop=True)
     counts_table.drop(['index','Chr','Start','End','Strand','Length'], axis=1, inplace=True) 
+    counts_table = sort_table(counts_table)
     counts_table.rename(columns=lambda x: x.replace('.sort.bam', ''), inplace=True)
     conditions = ["Cortical_neurons_microglia", "Cortical_neurons", "Microglia", "organoids"]
     mock_label = "mock"
@@ -193,14 +245,6 @@ def main():
     genes_details = genes_details.iloc[:, [0, -1]] #first and last col only
     # differential expression analysis
     up_genes, down_genes, de_results = differential_expression_deseq2(counts_table, conditions, mock_label, virus_label, fc_threshold, pval_threshold, min_expression, out_dir)
-    # SAVE RESULTS
-    #my_dict = {
-    #    "up_genes": up_genes,
-    #    "down_genes": down_genes,
-    #}
-    #output_json = out_dir + "Dseq_DE_genes_dict_FC2.json"
-    #with open(output_json, "w") as f:
-   #     json.dump(my_dict, f, indent=2)
     output_file = out_dir + "Dseq_results_all_conditions_FC_1.5.csv"
     de_results = de_results.set_index("Gene")
     de_results = de_results.join(genes_details)
@@ -214,10 +258,8 @@ def main():
     de_down = de_down.join(genes_details)
     de_down.to_csv(output_file_down, index=True)
     print("DE analysis finished!")
-    #overlap_up = build_overlap_df(de_up.index.tolist(), out_dir + "Dseq_overlap_up_SARS-CoV.csv")
-    #overlap_down = build_overlap_df(de_down.index.tolist(), out_dir + "Dseq_overlap_down_mock.csv")
-    #plot_venn(up_genes, "Genes up in SARS-CoV", out_dir + "Venn_up_SARS-CoV_dseq_FC_1.5.png")
-    #plot_venn(down_genes, "Genes up in mock", out_dir + "Venn_up_mock_dseq_FC_1.5.png")
+    plot_venn(up_genes, "Genes up in SARS-CoV", out_dir + "Venn_up_SARS-CoV_dseq_FC_1.5.png")
+    plot_venn(down_genes, "Genes up in mock", out_dir + "Venn_up_mock_dseq_FC_1.5.png")
     return
 
 if __name__ == "__main__":

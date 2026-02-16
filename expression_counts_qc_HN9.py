@@ -8,8 +8,8 @@ import pandas as pd
 import matplotlib.pyplot as plt
 from sklearn.decomposition import PCA
 import numpy as np
-import sys
-sys.path.insert(0, "Z:/Analysis/general_scripts")
+#import sys
+#sys.path.insert(0, "Z:/Analysis/general_scripts")
 import seaborn as sns
 from sklearn.preprocessing import StandardScaler
 from matplotlib.lines import Line2D
@@ -127,7 +127,7 @@ def colors(columns_names):
         "Microglia": "#2ca02c"             # green
     }    
     treatment_colors_map = {
-        "mock": "#ffffff",                  # white (no fill)
+        "mock":     "#FFC0CB",     # pink
         "SARS-CoV": "#000000"               # black (fill)
     }
        # Step 6: Define color and marker mappings
@@ -286,7 +286,7 @@ def plot_heatmap_genes(df, output_heatmap, output_table, cell_colors_map, treatm
     cell_legend_3 = Line2D([0], [0], color="#2ca02c", lw=6, label="Microglia")
     cell_legend_4 = Line2D([0], [0], color="#d62728", lw=6, label="organoids")
     
-    treatment_legend_1 = Line2D([0], [0], color="white", lw=6, label="mock", markeredgecolor="black", marker='s', markersize=10)
+    treatment_legend_1 = Line2D([0], [0], color="pink", lw=6, label="mock", markeredgecolor="black", marker='s', markersize=10)
     treatment_legend_2 = Line2D([0], [0], color="black", lw=6, label="SARS-CoV", marker='s', markersize=10)
     
     # Add legend to the plot
