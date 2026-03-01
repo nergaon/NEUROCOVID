@@ -27,6 +27,7 @@ def differential_expression_deseq2(df, conditions, mock_label, virus_label, fc_t
     print("size of df:", df.shape)
     rows = []
     rows.append({"condition": "All", "n_genes": df.shape[0], "SARS-CoV-2_genes": np.nan, "mock_genes": np.nan})
+    cell_colors_map, treatment_colors_map, treatment_markers, cell_types, treatments = colors(df.columns)
     for cond in conditions:
         cond_cols = [
             c for c in df.columns
@@ -38,17 +39,18 @@ def differential_expression_deseq2(df, conditions, mock_label, virus_label, fc_t
         mock_cols = [c for c in cond_cols if mock_label in c]
         virus_cols = [c for c in cond_cols if virus_label in c]
         print(cond, mock_cols, virus_cols)
-        min_samples = min(len(mock_cols), len(virus_cols))  #gene is express in all repeats
+        min_samples = min(len(mock_cols), len(virus_cols))  #gene is express in at least min samples
         if len(mock_cols) == 0 or len(virus_cols) == 0:
             print(f"No mock/virus columns for {cond}, skipping")
             continue
         count_data = df[cond_cols]
         # ---- Expression filter (DESeq2-style prefiltering) ----
-        mask = (
-            (count_data[mock_cols] > min_expression).sum(axis=1) >= min_samples
-        ) | (
-            (count_data[virus_cols] > min_expression).sum(axis=1) >= min_samples
-        )
+        mask = (count_data > min_expression).sum(axis=1) >= min_samples
+        #mask = (
+        #    (count_data[mock_cols] > min_expression).sum(axis=1) >= min_samples
+        #) | (
+        #    (count_data[virus_cols] > min_expression).sum(axis=1) >= min_samples
+        #)
         count_data = count_data.loc[mask]
         print(f"{cond}: {count_data.shape[0]} genes pass expression filter")
         background_genes = set(count_data.index)
@@ -82,8 +84,46 @@ def differential_expression_deseq2(df, conditions, mock_label, virus_label, fc_t
         enrichmen(background_genes, up_genes[cond], out_dir, cond, "up_SARS-CoV")
         enrichmen(background_genes, down_genes[cond], out_dir, cond, "up_mock")
         #plot heatmap
-        cell_colors_map, treatment_colors_map, treatment_markers, cell_types, treatments = colors(df.columns)
         plot_heatmap(virus_label, up_genes[cond], down_genes[cond], count_data, cond, out_dir, cell_colors_map, treatment_colors_map, cell_types, treatments, df)
+    #de analysis for all the mock cols vs all SARS-CoV cols
+    count_data_all = df.copy()
+    # ---- Expression filter (DESeq2-style prefiltering) ----
+    mask = (count_data_all > min_expression).sum(axis=1) >= 7 
+    count_data_all = count_data_all.loc[mask]
+    print(f"All_conditions: {count_data_all.shape[0]} genes pass expression filter")
+    coldata_all = pd.DataFrame(index=count_data_all.columns)
+    #Build metadata with BOTH factors
+    coldata_all["treatment"] = ["virus" if virus_label in c else "mock" for c in count_data_all.columns]
+    coldata_all["condition"] = [get_condition_from_col(c, mock_label, virus_label) for c in count_data_all.columns]
+    #Run DESeq2 with covariate model
+    dds_all = DeseqDataSet(
+        counts=count_data_all.T,
+        metadata=coldata_all,
+        design="~ condition + treatment",
+        refit_cooks=True)
+    dds_all.deseq2()
+    #Test virus vs mock effect
+    stats_all = DeseqStats(dds_all, contrast=("treatment", "virus", "mock"))
+    stats_all.summary()
+    res_all = stats_all.results_df.copy()
+    res_all["Gene"] = res_all.index
+    res_all["Condition"] = "All_conditions"
+    res_all = res_all.rename(columns={
+        "log2FoldChange": "Log2FC",
+        "padj": "FDR",
+        "pvalue": "PValue"})
+    all_results.append(res_all)
+    #Extract significant genes
+    sig_all = res_all[
+        (res_all["FDR"] < pval_threshold) &
+        (abs(res_all["Log2FC"]) > np.log2(fc_threshold))]
+    up_genes["All_conditions"] = set(sig_all[sig_all["Log2FC"] > 0]["Gene"])
+    down_genes["All_conditions"] = set(sig_all[sig_all["Log2FC"] < 0]["Gene"])
+    rows.append({"condition": "All_conditions", "n_genes": count_data_all.shape[0], 
+                     "SARS-CoV-2_genes": len(up_genes["All_conditions"]), "mock_genes": len(down_genes["All_conditions"])})
+    enrichmen(background_genes, up_genes["All_conditions"], out_dir, "all", "up_SARS-CoV")
+    enrichmen(background_genes, down_genes["All_conditions"], out_dir, "all", "up_mock")
+    plot_heatmap(virus_label, up_genes["All_conditions"], down_genes["All_conditions"], df, "all", out_dir, cell_colors_map, treatment_colors_map, cell_types, treatments, df)
 
     results_df = pd.concat(all_results, ignore_index=True)
     sum_table = pd.DataFrame(rows)
@@ -123,7 +163,7 @@ def plot_heatmap(virus_label,up_genes, down_genes, count_data, cond, out_dir, ce
     col_colors = ["black" if virus_label in c else "pink" for c in heatmap_df.columns]
     color_lut = {"SARS-CoV": "black","mock": "pink"}
     g = sns.clustermap(heatmap_df, cmap="coolwarm", center=0, col_colors=col_colors, cbar_pos=(0.02, 0.8, 0.03, 0.18),
-        col_cluster=False, xticklabels=False, yticklabels=False, figsize=(12, 14))
+        col_cluster=False, xticklabels=False, yticklabels=True, figsize=(12, 14))
     handles = [mpatches.Patch(color=color_lut[name], label=name) for name in color_lut]
     #g.ax_col_dendrogram.legend(handles=handles, title=cond, loc="center", fontsize=20, bbox_to_anchor=(0.5, 0.7), ncol=2, frameon=False)
     leg = g.ax_col_dendrogram.legend(handles=handles, title=cond, loc="center", bbox_to_anchor=(0.5, 0.7), ncol=2,
@@ -152,7 +192,7 @@ def plot_heatmap(virus_label,up_genes, down_genes, count_data, cond, out_dir, ce
     treatment_legend_2 = Line2D([0], [0], color="black", lw=6, label="SARS-CoV", marker='s', markersize=10)
     output_heatmap = out_dir + f"heatmap_{cond}_deseq2_FC_1.5_allSamples.png"
     g = sns.clustermap(heatmap_df_ordered, cmap="coolwarm", center=0, col_colors=col_colors, cbar_pos=(0.02, 0.8, 0.03, 0.18),
-        col_cluster=False, row_cluster=False, xticklabels=False, yticklabels=False, figsize=(12, 14))
+        col_cluster=False, row_cluster=False, xticklabels=False, yticklabels=True, figsize=(12, 14))
     
     # Add legend to the plot
     plt.legend(handles=[cell_legend_1, cell_legend_2, cell_legend_3, cell_legend_4,
@@ -171,7 +211,7 @@ def enrichmen(background_genes, sig_genes, out_dir, cond, direction):
     print(cond, len(sig_genes), len(background_genes))
     enr = gp.enrichr(
         gene_list=list(sig_genes),
-        gene_sets="GO_Biological_Process_2021",
+        gene_sets="GO_Biological_Process_2025",
         organism="Human",      #
         background=background_genes,
         cutoff=0.05)
@@ -243,6 +283,10 @@ def main():
     genes_details_input = in_dir + "biomart_genes_details.txt"
     genes_details = pd.read_csv(genes_details_input, sep="\t", index_col=0)  
     genes_details = genes_details.iloc[:, [0, -1]] #first and last col only
+    #replace the ensembl index with gene name
+    new_index = (
+    genes_details["Gene name"].reindex(counts_table.index).fillna(pd.Series(counts_table.index, index=counts_table.index)))
+    counts_table.index = new_index
     # differential expression analysis
     up_genes, down_genes, de_results = differential_expression_deseq2(counts_table, conditions, mock_label, virus_label, fc_threshold, pval_threshold, min_expression, out_dir)
     output_file = out_dir + "Dseq_results_all_conditions_FC_1.5.csv"
@@ -251,13 +295,17 @@ def main():
     de_results.to_csv(output_file, index=True)
     output_file_up = out_dir + "Dseq_results_upregulated_SARS-CoV_FC_1.5.csv"
     de_up = dict_to_table(up_genes)
-    de_up = de_up.join(genes_details)
+    #de_up = de_up.join(genes_details)
+    de_up = de_up.merge(genes_details, left_index=True, right_on="Gene name", how="left")
     de_up.to_csv(output_file_up, index=True)
     output_file_down = out_dir + "Dseq_results_upregulated_mock_FC_1.5.csv"
     de_down = dict_to_table(down_genes)
-    de_down = de_down.join(genes_details)
+    #de_down = de_down.join(genes_details)
+    de_down = de_down.merge(genes_details, left_index=True, right_on="Gene name", how="left")
     de_down.to_csv(output_file_down, index=True)
     print("DE analysis finished!")
+    up_genes.pop("All_conditions", None)
+    down_genes.pop("All_conditions", None)
     plot_venn(up_genes, "Genes up in SARS-CoV", out_dir + "Venn_up_SARS-CoV_dseq_FC_1.5.png")
     plot_venn(down_genes, "Genes up in mock", out_dir + "Venn_up_mock_dseq_FC_1.5.png")
     return

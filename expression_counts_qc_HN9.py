@@ -4,6 +4,8 @@ the program:
 creates qc plots
 """
 
+import matplotlib
+matplotlib.use("Agg")   # non-interactive backend
 import pandas as pd
 import matplotlib.pyplot as plt
 from sklearn.decomposition import PCA
@@ -78,10 +80,10 @@ def plot_scatter(df, samples, in_dir):
             print(str(i) + ' ' +str(j))
             plt.xlabel(df.columns[i],fontsize=40)
             plt.ylabel(df.columns[j],fontsize=40)
-            plt.plot([0, 22], [0, 22], 'k-', color = 'black')
+            plt.plot([0, 22], [0, 22], 'k-')
             fig_title = 'log2(counts)'
             plt.title(fig_title)
-            output = in_dir + '/scatter/' + samples[i] + '_vs_' + samples[j] + '.jpg'
+            output = in_dir + '/scatter/' + samples[i] + '_vs_' + samples[j] + '_tpm.jpg'
             plt.savefig(output)
             plt.close()       
     plt.tight_layout()
@@ -307,28 +309,43 @@ def plot_heatmap_genes(df, output_heatmap, output_table, cell_colors_map, treatm
 
 def main():
     min_samples = 0.1 #min % samples with less than min expression counts
-    min_expression = 6 #min log2 expression value
-    input_genes_data = '/gpfs0/tals/projects/Analysis/NEUROCOVID/hadas_harschnitz/bulkRNA/expression_table/biomart_genes_details.txt'
-    genes_table = pd.read_csv(input_genes_data, delimiter =  "\t")    
+    min_expression = 3 #min log2 expression value. without tpm, the value is 6
     
+    # ---------- Load gene annotation (optional) ----------
+    input_genes_data = '/gpfs0/tals/projects/Analysis/NEUROCOVID/hadas_harschnitz/bulkRNA/expression_table/biomart_genes_details.txt'
+    genes_table = pd.read_csv(input_genes_data, sep="\t")
+    # ---------- Load featureCounts output ----------
     in_dir = '/gpfs0/tals/projects/Analysis/NEUROCOVID/hadas_harschnitz/bulkRNA/expression_table/'
     input_expression = in_dir + 'expression_table_HN1.txt'
     print(input_expression)
-    counts_table = pd.read_csv(input_expression, delimiter =  "\s|\t", engine='python', skiprows=1)        
-    counts_table = counts_table.reset_index().set_index('Geneid', drop=True)
-    counts_table.drop(['index','Chr','Start','End','Strand','Length'], axis=1, inplace=True) 
-    counts_table.rename(columns=lambda x: x.replace('.sort.bam', ''), inplace=True)
-    counts_table_log = counts_table.replace(0, 1)
-    counts_table_log = np.log2(counts_table_log)
-    samples = counts_table.columns
-    result_dict = create_dictionary(samples) #color of each sample
-    output_figure = in_dir + 'distribution_samples.jpg'
-    plot_hist(counts_table_log,result_dict, output_figure)
+    counts_table = pd.read_csv(input_expression, sep="\t", comment="#")
+    # ---------- Identify columns ----------
+    meta_cols = ["Geneid", "Chr", "Start", "End", "Strand", "Length"]
+    sample_cols = [c for c in counts_table.columns if c not in meta_cols]
+    # ---------- Step 1: RPK (length normalization) ----------
+    length_kb = counts_table["Length"] / 1000
+    rpk = counts_table[sample_cols].div(length_kb, axis=0)
+    # ---------- Step 2: TPM (library-size normalization) ----------
+    rpk_sum = rpk.sum(axis=0)
+    tpm = rpk.div(rpk_sum, axis=1) * 1e6
+    # ---------- Set Gene IDs as index ----------
+    tpm.index = counts_table["Geneid"]
+    # ---------- Clean sample names ----------
+    tpm.rename(columns=lambda x: x.replace('.sort.bam', ''), inplace=True)
+    # ---------- Step 3: log2(TPM + 1) ----------
+    tpm_log2 = np.log2(tpm + 1)
+    tpm_log2 = tpm_log2.reset_index().set_index('Geneid', drop=True) 
+    tpm_log2.rename(columns=lambda x: x.replace('.sort.bam', ''), inplace=True)
     
-    #plot_scatter(counts_table_log, samples, in_dir)
+    samples = tpm_log2.columns
+    result_dict = create_dictionary(samples) #color of each sample
+    output_figure = in_dir + 'distribution_samples_tpm.jpg'
+    plot_hist(tpm_log2, result_dict, output_figure)
+    
+    #plot_scatter(tpm_log2, samples, in_dir)
     #create a table with only express genes
-    sort_table_df = sort_table(counts_table_log)
-    output_table = in_dir + 'log_express_gene.txt'
+    sort_table_df = sort_table(tpm_log2)
+    output_table = in_dir + 'log_express_gene_tpm.txt'
     sort_table_df.to_csv(output_table, sep="\t", index=True)
     #get only express genes and set all the values that are smaller than min_expression to be min_expression
     express_genes = select_rows(sort_table_df, min_expression, min_samples, output_table, genes_table)

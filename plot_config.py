@@ -57,5 +57,8 @@ def sort_table(df):
     df = df[sorted_cols]
     return df       
 
+def main():
+    return
+        
 if __name__ == "__main__":
     main() 
