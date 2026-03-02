@@ -4,7 +4,7 @@ from pydeseq2.dds import DeseqDataSet
 from pydeseq2.ds import DeseqStats
 from venn import venn
 import matplotlib.pyplot as plt
-import json
+from goatools.obo_parser import GODag
 import seaborn as sns
 import matplotlib.patches as mpatches
 import gseapy as gp
@@ -12,6 +12,7 @@ from gprofiler import GProfiler
 from matplotlib.lines import Line2D
 from plot_config import colors
 from plot_config import sort_table
+go_dag = GODag("/gpfs0/tals/projects/Analysis/NEUROCOVID/hadas_harschnitz/bulkRNA/DE/GO/go-basic.obo")
 
 def differential_expression_deseq2(df, conditions, mock_label, virus_label, fc_threshold, pval_threshold, min_expression, out_dir=None):
     """
@@ -21,6 +22,7 @@ def differential_expression_deseq2(df, conditions, mock_label, virus_label, fc_t
         down_genes: dict of genes up in mock per condition
         results_df: dataframe of all DE results
     """
+    all_results_GO = []
     all_results = []
     up_genes = {}
     down_genes = {}
@@ -46,11 +48,6 @@ def differential_expression_deseq2(df, conditions, mock_label, virus_label, fc_t
         count_data = df[cond_cols]
         # ---- Expression filter (DESeq2-style prefiltering) ----
         mask = (count_data > min_expression).sum(axis=1) >= min_samples
-        #mask = (
-        #    (count_data[mock_cols] > min_expression).sum(axis=1) >= min_samples
-        #) | (
-        #    (count_data[virus_cols] > min_expression).sum(axis=1) >= min_samples
-        #)
         count_data = count_data.loc[mask]
         print(f"{cond}: {count_data.shape[0]} genes pass expression filter")
         background_genes = set(count_data.index)
@@ -81,8 +78,10 @@ def differential_expression_deseq2(df, conditions, mock_label, virus_label, fc_t
         down_genes[cond] = set(sig[sig["Log2FC"] < 0]["Gene"])
         rows.append({"condition": cond, "n_genes": count_data.shape[0], 
                      "SARS-CoV-2_genes": len(up_genes[cond]), "mock_genes": len(down_genes[cond])})
-        enrichmen(background_genes, up_genes[cond], out_dir, cond, "up_SARS-CoV")
-        enrichmen(background_genes, down_genes[cond], out_dir, cond, "up_mock")
+        res_GO = enrichment(background_genes, up_genes[cond], out_dir, cond, "up_SARS-CoV")
+        all_results_GO.append(res_GO)
+        res_GO = enrichment(background_genes, down_genes[cond], out_dir, cond, "up_mock")
+        all_results_GO.append(res_GO)
         #plot heatmap
         plot_heatmap(virus_label, up_genes[cond], down_genes[cond], count_data, cond, out_dir, cell_colors_map, treatment_colors_map, cell_types, treatments, df)
     #de analysis for all the mock cols vs all SARS-CoV cols
@@ -121,14 +120,77 @@ def differential_expression_deseq2(df, conditions, mock_label, virus_label, fc_t
     down_genes["All_conditions"] = set(sig_all[sig_all["Log2FC"] < 0]["Gene"])
     rows.append({"condition": "All_conditions", "n_genes": count_data_all.shape[0], 
                      "SARS-CoV-2_genes": len(up_genes["All_conditions"]), "mock_genes": len(down_genes["All_conditions"])})
-    enrichmen(background_genes, up_genes["All_conditions"], out_dir, "all", "up_SARS-CoV")
-    enrichmen(background_genes, down_genes["All_conditions"], out_dir, "all", "up_mock")
+    res_GO = enrichment(background_genes, up_genes["All_conditions"], out_dir, "all", "up_SARS-CoV")
+    all_results_GO.append(res_GO)
+    res_GO = enrichment(background_genes, down_genes["All_conditions"], out_dir, "all", "up_mock")
+    all_results_GO.append(res_GO)
     plot_heatmap(virus_label, up_genes["All_conditions"], down_genes["All_conditions"], df, "all", out_dir, cell_colors_map, treatment_colors_map, cell_types, treatments, df)
 
     results_df = pd.concat(all_results, ignore_index=True)
     sum_table = pd.DataFrame(rows)
     print(sum_table)
-    return up_genes, down_genes, results_df
+    all_results_GO_df = pd.concat(all_results_GO, ignore_index=True)
+    return up_genes, down_genes, results_df, all_results_GO_df
+
+def build_go_matrix(all_results_GO_df):
+    all_results_GO_df["Genes_list"] = all_results_GO_df["Genes"].str.split(";")
+    go_dict = {}
+    for _, row in all_results_GO_df.iterrows():
+        term = row["Term"]
+        cond_dir = row["cond_dir"]
+        genes = set(row["Genes_list"])
+        if term not in go_dict:
+            go_dict[term] = {}
+        go_dict[term][cond_dir] = genes
+    go_matrix = pd.DataFrame.from_dict(go_dict, orient="index")
+    # convert sets to comma-separated strings
+    go_matrix = go_matrix.applymap(lambda x: ",".join(sorted(x)) if isinstance(x, set) else "")
+    return go_matrix
+
+def remove_redundant_go(all_results_GO_df):
+    term_to_genes = (
+        all_results_GO_df
+        .groupby("Term")["Genes"]
+        .apply(lambda x: set(";".join(x).split(";")))
+        .to_dict())
+    terms = list(term_to_genes.keys())
+    to_remove = set()
+    for i in range(len(terms)):
+        for j in range(len(terms)):
+            if i == j:
+                continue
+            genes_i = term_to_genes[terms[i]]
+            genes_j = term_to_genes[terms[j]]
+            if genes_i.issubset(genes_j) and len(genes_i) < len(genes_j):
+                to_remove.add(terms[i])
+    filtered_df = all_results_GO_df[~all_results_GO_df["Term"].isin(to_remove)]
+    filtered_df["Parent_Process"] = filtered_df["Term"].apply(get_parent_process)
+    return filtered_df
+
+def get_parent_process(term_name):
+    for go_id, go_obj in go_dag.items():
+        if go_obj.name == term_name:
+            parents = go_obj.get_all_parents()
+            parent_names = [go_dag[p].name for p in parents]
+            return ";".join(parent_names[:3])  # first 3 parents
+    return ""
+
+def collapse_identical_gene_sets(df):
+    """
+    df must contain:
+        Term
+        Genes  (semicolon-separated string)
+        Adjusted P-value
+    """
+    # Convert gene string to sorted canonical representation
+    df["GeneSetKey"] = df["Genes"].apply(
+        lambda x: ";".join(sorted(set(x.split(";")))))
+    # For identical gene sets → keep row with smallest adjusted p-value
+    collapsed = (
+        df.sort_values("Adjusted P-value")
+          .drop_duplicates(subset="GeneSetKey", keep="first")
+          .drop(columns="GeneSetKey"))
+    return collapsed
 
 def arrangeDS(count_data_df, samples):
     conditions = ["Cortical_neurons_microglia", "Cortical_neurons", "Microglia", "organoids"]
@@ -206,8 +268,7 @@ def plot_heatmap(virus_label,up_genes, down_genes, count_data, cond, out_dir, ce
     g.savefig(output_heatmap, dpi=300, bbox_inches="tight")    
     return
 
-def enrichmen(background_genes, sig_genes, out_dir, cond, direction):
-    #this is not working well, need to convert ensembl IDs to gene names first
+def enrichment(background_genes, sig_genes, out_dir, cond, direction):
     print(cond, len(sig_genes), len(background_genes))
     enr = gp.enrichr(
         gene_list=list(sig_genes),
@@ -215,9 +276,13 @@ def enrichmen(background_genes, sig_genes, out_dir, cond, direction):
         organism="Human",      #
         background=background_genes,
         cutoff=0.05)
-    enrich_res = enr.results
-    output_file = out_dir + f"GO_BP_{cond}_{direction}_deseq2_FC_1.5.csv"
+    enrich_res = enr.results.copy()
+    enrich_res["cond"] = cond
+    enrich_res["direction"] = direction
+    enrich_res["cond_dir"] = cond + "_" + direction
+    output_file = out_dir + f"GO/GO_BP_{cond}_{direction}_deseq2_FC_1.5.csv"
     enrich_res.to_csv(output_file, index=False)
+    enrich_res = collapse_identical_gene_sets(enrich_res)
     return enrich_res
 
 def get_condition_from_col(col_name, mock_label, virus_label):
@@ -288,17 +353,23 @@ def main():
     genes_details["Gene name"].reindex(counts_table.index).fillna(pd.Series(counts_table.index, index=counts_table.index)))
     counts_table.index = new_index
     # differential expression analysis
-    up_genes, down_genes, de_results = differential_expression_deseq2(counts_table, conditions, mock_label, virus_label, fc_threshold, pval_threshold, min_expression, out_dir)
-    output_file = out_dir + "Dseq_results_all_conditions_FC_1.5.csv"
+    up_genes, down_genes, de_results, all_results_GO_df = differential_expression_deseq2(counts_table, conditions, mock_label, virus_label, fc_threshold, pval_threshold, min_expression, out_dir)
+    filtered_GO_df = remove_redundant_go(all_results_GO_df)
+    go_matrix = build_go_matrix(filtered_GO_df)
+    padj_summary = (filtered_GO_df.groupby("Term")["Adjusted P-value"].min())
+    go_matrix["Min_Adjusted_Pvalue"] = padj_summary
+    output_file = out_dir + "GO/Combined_GO_matrix.xlsx"
+    go_matrix.to_excel(output_file, index=True, engine="openpyxl")
+    output_file = out_dir + "GO/Dseq_results_all_conditions_FC_1.5.csv"
     de_results = de_results.set_index("Gene")
     de_results = de_results.join(genes_details)
     de_results.to_csv(output_file, index=True)
-    output_file_up = out_dir + "Dseq_results_upregulated_SARS-CoV_FC_1.5.csv"
+    output_file_up = out_dir + "GO/Dseq_results_upregulated_SARS-CoV_FC_1.5.csv"
     de_up = dict_to_table(up_genes)
     #de_up = de_up.join(genes_details)
     de_up = de_up.merge(genes_details, left_index=True, right_on="Gene name", how="left")
     de_up.to_csv(output_file_up, index=True)
-    output_file_down = out_dir + "Dseq_results_upregulated_mock_FC_1.5.csv"
+    output_file_down = out_dir + "GO/Dseq_results_upregulated_mock_FC_1.5.csv"
     de_down = dict_to_table(down_genes)
     #de_down = de_down.join(genes_details)
     de_down = de_down.merge(genes_details, left_index=True, right_on="Gene name", how="left")
