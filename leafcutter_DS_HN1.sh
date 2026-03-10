@@ -8,9 +8,8 @@ leafcutter_folders=(
   "/gpfs0/tals/projects/Analysis/NEUROCOVID/hadas_harschnitz/bulkRNA/leafcutter_0.2.9/Cortical_neurons_microglia"
 	"/gpfs0/tals/projects/Analysis/NEUROCOVID/hadas_harschnitz/bulkRNA/leafcutter_0.2.9/Cortical_neurons"
 	"/gpfs0/tals/projects/Analysis/NEUROCOVID/hadas_harschnitz/bulkRNA/leafcutter_0.2.9/Microglia"
-	"/gpfs0/tals/projects/Analysis/NEUROCOVID/hadas_harschnitz/bulkRNA/leafcutter_0.2.9/Organoids"
+	"/gpfs0/tals/projects/Analysis/NEUROCOVID/hadas_harschnitz/bulkRNA/leafcutter_0.2.9/organoids"
  )
-
 leafcutter_scripts="/gpfs0/tals/projects/software/leafcutter_0.2.9"
 
 #Differential intron excision analysis
@@ -19,7 +18,6 @@ leafcutter_scripts="/gpfs0/tals/projects/software/leafcutter_0.2.9"
 # Loop through each folder and perform the analysis
 for leafcutter_folder in "${leafcutter_folders[@]}"; do
 	cd $leafcutter_folder
-  # Set the path to your groups file
 	$leafcutter_scripts/leafcutter/scripts/leafcutter_ds.R --num_threads 4 -i 2  -g 2 --exon_file=/gpfs0/tals/projects/data/Transcriptomes/human_hg38/GCF_000001405.39_GRCh38.p13_genomic_leafcutter.txt.gz ../NEUROCOVID_perind_numers.counts group_file.txt
 done
 

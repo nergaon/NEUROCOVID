@@ -1,13 +1,15 @@
 #!/bin/bash
+#/gpfs0/tals/projects/Analysis/NEUROCOVID/hadas_harschnitz/bulkRNA/scripts->qsub -cwd -V -q tals.q featureCounts_SARS-CoV.sh
 featureCountsDir=/gpfs0/tals/projects/software/subread-2.0.1-Linux-x86_64
 
 inputDir=/gpfs0/tals/projects/Analysis/NEUROCOVID/hadas_harschnitz/bulkRNA/
-cd $inputDir/bam_files_SARS-CoV-2
+#cd $inputDir/bam_files_SARS-CoV-2
+cd $inputDir/bam_files_SARS-CoV-2_ref
 
 # Read bam files from bam_list.txt
 bamFiles=$(cat bam_list.txt | tr '\n' ' ')
 
-$featureCountsDir/bin/featureCounts -p -B -C -g gene_name -a /gpfs0/tals/projects/data/Genomes/SARS-CoV-2_Delta/NCBI_Ensembl_ref/Sars_cov_2.ASM985889v3.101.gtf -o $inputDir/expression_table_SARS-CoV-2/expression_table_SARS-CoV-2.txt $bamFiles
+$featureCountsDir/bin/featureCounts -p -B -C -g gene_name -a /gpfs0/tals/projects/data/Genomes/SARS-CoV-2_Delta/NCBI_Ensembl_ref/Sars_cov_2.ASM985889v3.101.gtf -o $inputDir/expression_table_SARS-CoV-2/expression_table_SARS-CoV-2_ref.txt $bamFiles
 #--minOverlap Min overlapping bases : 1
 #-p paired-end/fragments counting.
 #-B Only count read pairs that have both ends aligned.

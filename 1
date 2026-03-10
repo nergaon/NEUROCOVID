@@ -1,0 +1,26 @@
+Loading counts file and building cluster index...
+Found 34686 unique clusters in counts file
+
+Processing Cortical_neurons...
+  Found 26466 Success clusters
+  Mock samples: 4
+  SARS-CoV samples: 4
+
+Processing Cortical_neurons_microglia...
+  Found 28481 Success clusters
+  Mock samples: 4
+  SARS-CoV samples: 4
+Traceback (most recent call last):
+  File "/gpfs0/tals/projects/Analysis/NEUROCOVID/hadas_harschnitz/bulkRNA/scripts/create_leafcutter_summary.py", line 115, in <module>
+    avg_expr_mock = subset_df[tissue_samples_mock].values.flatten().mean()
+                    ~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^
+  File "/gpfs0/tals/projects/software/spyder/lib/python3.11/site-packages/pandas/core/frame.py", line 3908, in __getitem__
+    data = self._take_with_is_copy(indexer, axis=1)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/gpfs0/tals/projects/software/spyder/lib/python3.11/site-packages/pandas/core/generic.py", line 4090, in _take_with_is_copy
+    if self.ndim == 2 and not result._get_axis(axis).equals(self._get_axis(axis)):
+                                                            ^^^^^^^^^^^^^^^^^^^^
+  File "/gpfs0/tals/projects/software/spyder/lib/python3.11/site-packages/pandas/core/generic.py", line 562, in _get_axis
+    @final
+
+KeyboardInterrupt

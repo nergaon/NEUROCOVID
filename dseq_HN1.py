@@ -71,9 +71,7 @@ def differential_expression_deseq2(df, conditions, mock_label, virus_label, fc_t
             "pvalue": "PValue"})
         all_results.append(res)
         # ---- Significant genes ----
-        sig = res[
-            (res["FDR"] < pval_threshold) &
-            (abs(res["Log2FC"]) > np.log2(fc_threshold))]
+        sig = res[(res["FDR"] < pval_threshold) & (abs(res["Log2FC"]) > np.log2(fc_threshold))]
         up_genes[cond] = set(sig[sig["Log2FC"] > 0]["Gene"])
         down_genes[cond] = set(sig[sig["Log2FC"] < 0]["Gene"])
         rows.append({"condition": cond, "n_genes": count_data.shape[0], 
