@@ -193,9 +193,25 @@ print("\nColumn names:")
 print(results_df.columns.tolist())
 print("\nFirst few rows:")
 print(results_df.head(10))
-print("\nColumn names:")
-print(results_df.columns.tolist())
-print("\nFirst few rows:")
-print(results_df.head(10))
+
+# New output: filtered clusters meeting criteria
+filtered_output = ["Filtered clusters meeting criteria (p.adjust <= 0.05, deltapsi >= 0.1, mock_expr >= 20, sarscov_expr >= 20):"]
+for cluster_id, tissue_data in cluster_data.items():
+    for tissue_name, data in tissue_data.items():
+        if (not pd.isna(data['p.adjust']) and data['p.adjust'] <= 0.05 and
+            not pd.isna(data['max_abs_deltapsi']) and data['max_abs_deltapsi'] >= 0.1 and
+            not pd.isna(data['avg_expr_mock']) and data['avg_expr_mock'] >= 20 and
+            not pd.isna(data['avg_expr_sarscov']) and data['avg_expr_sarscov'] >= 20):
+            junctions = cluster_to_introns.get(cluster_id, [])
+            filtered_output.append(f"Cluster: {cluster_id}, Tissue: {tissue_name}, Genes: {data['genes']}, Junctions: {junctions}")
+
+# Save filtered output to file
+output_file_filtered = base_dir / "filtered_clusters_junctions.txt"
+with open(output_file_filtered, "w") as f:
+    for line in filtered_output:
+        f.write(line + "\n")
+
+print(f"\n✓ Filtered clusters output saved to: {output_file_filtered}")
+print(f"Number of filtered clusters: {len(filtered_output) - 1}")  # minus the header
 
 
