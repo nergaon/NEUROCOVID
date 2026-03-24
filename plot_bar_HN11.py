@@ -7,12 +7,13 @@ Created on Wed Mar 25 11:11:13 2020
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
-import sys
+import os
+import shutil
 '''
 plot count and PSI bar from all the clusters in the JSR counts table
 '''
 
-def plot_bar_2(persent_cluster, value_cluster, fig_title, main_dir, main_col, legend_color_map):
+def plot_bar_2(persent_cluster, value_cluster, fig_title, main_dir, legend_color_map):
     '''
     input: datafaram with the clusters values in percent
     output: bar plot of the introns
@@ -27,11 +28,9 @@ def plot_bar_2(persent_cluster, value_cluster, fig_title, main_dir, main_col, le
     intron_legend  = intron_legend.tolist() 
     legend_color_map = create_color_map(intron_legend, legend_color_map)
 
-    #change col names to be only the species
-    persent_cluster.columns = [col.split('_')[-1] for col in persent_cluster.columns[0:]]
-    value_cluster.columns = [col.split('_')[-1] for col in value_cluster.columns[0:]]
-    #value_cluster.drop(columns=[main_col], inplace = True)
-    #persent_cluster.drop(columns=[main_col], inplace = True)
+    #drop only the trailing replicate id from sample names (e.g. ..._14)
+    persent_cluster.columns = ['_'.join(col.split('_')[:-1]) for col in persent_cluster.columns]
+    value_cluster.columns = ['_'.join(col.split('_')[:-1]) for col in value_cluster.columns]
     index = []
     for i in range(0, len(persent_cluster.columns)-1):      
         if persent_cluster.columns[i] != persent_cluster.columns[i+1]:
@@ -49,6 +48,10 @@ def plot_bar_2(persent_cluster, value_cluster, fig_title, main_dir, main_col, le
     #the names in x axis
     labels = persent_cluster.columns
     labels = labels.tolist()
+    labels = [
+        'mock' if 'mock' in str(name).lower() else ('SARS-CoV' if 'sars-cov' in str(name).lower() else name)
+        for name in labels
+    ]
     unique_names = []
     for i in range(len(labels)):
         if i in zeroCol:
@@ -69,7 +72,6 @@ def plot_bar_2(persent_cluster, value_cluster, fig_title, main_dir, main_col, le
     introns_counts = value_cluster.values
     bars_persent = np.zeros(shape=(N))
     bars_counts = np.zeros(shape=(N))
-    #fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(4,4))
     # Create subplots
     fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(4, 4), gridspec_kw={'height_ratios': [1, 1]})
 
@@ -128,67 +130,68 @@ def create_color_map(intron_legend, legend_color_map):
             color_index += 1
     return legend_color_map
 
-def main():  
-    cell_type = ['Cortical_neurons', 'organoids', 'Cortical_neurons_microglia', 'Microglia']
-    #main_col = 'h_junction'
-    #group_1 = 'GSE115736'
-    #group_2 = 'GSE116177'
-    
+def main():
+    cell_type = ['Cortical_neurons_microglia', 'Cortical_neurons', 'Microglia', 'organoids']
     main_dir = '/gpfs0/tals/projects/Analysis/NEUROCOVID/hadas_harschnitz/bulkRNA/leafcutter_0.2.9/'
-    sum_table_input = main_dir + 'filtered_clusters_junctions.txt'
-    sum_df = pd.read_csv(sum_table_input, sep='\t',index_col=0)
-    clusters_list = sum_df.index.tolist()
+    output_dir = os.path.join(main_dir, 'genes_figs')
+    if os.path.isdir(output_dir):
+        shutil.rmtree(output_dir)
+    os.makedirs(output_dir, exist_ok=True)
+    # Load the full counts file once
+    # Format: space-separated; first row = sample names; first col = junction (chr:start:end:clu_N_strand)
+    counts_df = pd.read_csv(main_dir + 'NEUROCOVID_perind_numers.counts', sep=' ', index_col=0)
+
+    # Parse junction index into h_junction (chr:start:end) and cluster id (chr:clu_N_strand)
+    junc_index = counts_df.index.tolist()
+    h_junctions = [j.rsplit(':', 1)[0] for j in junc_index]           # e.g. 'chr1:15947:16607'
+    clu_parts   = [j.rsplit(':', 1)[1] for j in junc_index]           # e.g. 'clu_1_-'
+    chroms      = [j.split(':')[0]     for j in junc_index]           # e.g. 'chr1'
+    clusters    = [c + ':' + p for c, p in zip(chroms, clu_parts)]    # e.g. 'chr1:clu_1_-'
+    counts_df.index.name = 'junctions'  # rename index to 'cluster'
+    counts_df['cluster'] = clusters
+    legend_color_map = {}
 
     for one_cell in cell_type:
         print(one_cell)
-        #cell_table = sum_df[[main_col, 'cluster'] + sum_df.filter(like=one_cell).columns.tolist()]
-        #cell_col_p = one_cell + '_p.adjust'
-        #cell_col_deltaPSI = one_cell + '_abs_deltapsi'
-        #cell_col_cluster = one_cell + '_cluster'
-        #sucess_clusters = cell_table.loc[cell_table[cell_col_p].notnull(), 'cluster'].unique()
-        percent_table_input = main_dir + one_cell + "/AS_clusters_psi_" + version + ".txt"
-        percent_table = pd.read_csv(percent_table_input, sep='\t')
-        # Split the 'Unnamed: 0' column into two columns
-        percent_table[['h_junction', 'cluster']] = percent_table['Unnamed: 0'].str.extract(r'(.+):(clu_.*)')
-        # Set the 'index' column as the index of the DataFrame
-        percent_table.set_index('h_junction', inplace=True)
-        # Drop the original 'Unnamed: 0' column
-        percent_table.drop(columns=['Unnamed: 0'], inplace=True)
-        value_table_input = main_dir + one_cell + "/AS_clusters_value_" + version + ".txt"
-        value_table = pd.read_csv(value_table_input, sep=' ')
-        # Split the 'Unnamed: 0' column into two parts
-        value_table[[main_col, 'cluster']] = value_table['Unnamed: 0'].str.rsplit(':', n=1, expand=True)
-        # Drop the original 'Unnamed: 0' column
-        value_table.drop(columns=['Unnamed: 0'], inplace=True)
-        value_table.set_index(main_col, inplace=True)
+        cell_dir = main_dir + one_cell + '/'
+
+        # Get sample columns for this cell type
+        group_df = pd.read_csv(cell_dir + 'group_file.txt', sep=' ', header=None, names=['sample', 'condition'])
+        sample_cols = group_df['sample'].tolist()
+
+        # value_table: counts for this cell type's samples + cluster column
+        value_table = counts_df[sample_cols + ['cluster']].copy()
+
+        # percent_table: PSI = junction count / total cluster count per sample
+        percent_table = value_table.copy()
+        for sample in sample_cols:
+            cluster_totals = value_table.groupby('cluster')[sample].transform('sum')
+            percent_table[sample] = value_table[sample].div(cluster_totals).fillna(0)
+
+        # Success clusters from significance file
+        sig_df = pd.read_csv(cell_dir + 'leafcutter_ds_cluster_significance.txt', sep='\t')
+        sucess_clusters = sig_df.loc[sig_df['status'] == 'Success', 'cluster'].tolist()
+
         count_fig = 0
-        for cluster in sucess_clusters: #select clusters to plot
+        for cluster in sucess_clusters:
             print(cluster)
-            #print(cluster)
-            p_value = cell_table[cell_table['cluster'] == cluster][cell_col_p].unique()
-            formatted_p_value = "{:.3f}".format(p_value[0])
-            deltapsi = cell_table[cell_table['cluster'] == cluster][cell_col_deltaPSI].abs().max()
-            formatted_deltapsi = "{:.3f}".format(deltapsi)
-            comment = 'p=' + str(formatted_p_value) + "_deltapsi=" + str(formatted_deltapsi)
-            count_fig = count_fig + 1
-            #select the cluter and its introns in the same order in the count and persent db
-            persent_cluster = percent_table.loc[percent_table['cluster'] == cluster]
-            persent_cluster = persent_cluster.sort_values(by=['h_junction']) 
-            gene_name = sum_df.loc[sum_df['cluster'] == cluster, 'genes'].values[0]
-            #persent_cluster.drop(columns=['ensembl','symbol','mouse_junction','cluster'], inplace = True)
-            persent_cluster.drop(columns=['cluster'], inplace = True)
-            value_cluster = value_table[value_table.index.isin(persent_cluster.index)]
-            value_cluster = value_cluster.drop(columns=['cluster'])
-            #plot fig
+            count_fig += 1
+            persent_cluster = percent_table.loc[percent_table['cluster'] == cluster].copy()
+            #persent_cluster = persent_cluster.sort_index()
+            row = sig_df.loc[sig_df['cluster'] == cluster].iloc[0]
+            gene_name = row['genes']
+            p_adjust = row['p.adjust']
+            formatted_p = '{:.3f}'.format(p_adjust) if pd.notna(p_adjust) else 'NA'
+            persent_cluster.drop(columns=['cluster'], inplace=True)
+            value_cluster = value_table.loc[value_table['cluster'] == cluster].copy()
+            value_cluster.drop(columns=['cluster'], inplace=True)
             try:
-                fig_title = one_cell + "_" + gene_name + "_" + cluster + "_" + comment
-            except:
-                fig_title = one_cell + "_" + cluster + "_" + comment
-            legend_color_map = plot_bar_2(persent_cluster, value_cluster, fig_title, main_dir, main_col, legend_color_map) 
-            #fig_title = one_cell + "_" + gene_name
-            #plot_bar_1(persent_cluster, fig_title, main_dir, main_col)
+                fig_title = one_cell + '_' + str(gene_name) + '_' + cluster + '_p=' + formatted_p
+            except Exception:
+                fig_title = one_cell + '_' + cluster + '_p=' + formatted_p
+            legend_color_map = plot_bar_2(persent_cluster, value_cluster, fig_title, main_dir, legend_color_map)
         print(count_fig, 'success clusters in', one_cell)
-          
+
     return
     
 if __name__ == "__main__":
